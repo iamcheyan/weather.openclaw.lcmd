@@ -7,7 +7,7 @@ import sys
 import os
 import json
 from PIL import Image, ImageDraw, ImageFont
-import holidays # 引入假期库
+import holidays
 
 # 1. 加载配置与国际化
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
@@ -84,10 +84,11 @@ def create_chart(weather_file, output_file):
             break
 
     # 绘制假期标注
+    from datetime import timedelta
     for d in dates:
         if d.date() in geo_holidays:
             # 在底部日期上方一点，加一个淡红色的竖条
-            ax.axvspan(d - mdates.DateOffset(hours=6), d + mdates.DateOffset(hours=6), color='#ff4757', alpha=0.08)
+            ax.axvspan(d - timedelta(hours=6), d + timedelta(hours=6), color='#ff4757', alpha=0.08)
 
     ax.fill_between(dates, highs, lows, color='#f0f0f0', alpha=0.3)
     
@@ -100,12 +101,10 @@ def create_chart(weather_file, output_file):
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
     
     # 动态着色：如果是假期，日期文字变红
-    xticks = ax.get_xticks()
     plt.xticks(dates, color='#666666', fontsize=10)
     for label in ax.get_xticklabels():
-        # 这里需要从 label text 找回日期
         try:
-            cur_date_str = label.get_text() # 格式 MM/DD
+            cur_date_str = label.get_text()
             for d_orig in dates:
                 if d_orig.strftime('%m/%d') == cur_date_str:
                     if d_orig.date() in geo_holidays:

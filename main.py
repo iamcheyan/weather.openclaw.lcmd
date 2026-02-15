@@ -48,8 +48,6 @@ def main():
     weather_data = get_weather()
     if not weather_data: return
 
-    # 初始化假期检查
-    # 如果用户的语言是 zh 且国家是 JP，我们可以在假期名后面稍微标注一下
     geo_holidays = holidays.CountryHoliday(COUNTRY)
 
     times = weather_data['time']

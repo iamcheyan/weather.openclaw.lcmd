@@ -1,0 +1,5 @@
+config.json
+*.log
+*.png
+*.tmp.png
+.base.png

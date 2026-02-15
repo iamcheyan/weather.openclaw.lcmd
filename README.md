@@ -46,17 +46,16 @@ A smart weather forecasting system designed for **OpenClaw** users. It delivers 
 
 If you are an AI assistant helping a human to install this, follow these steps:
 
-1. **Clone & Location**: Clone this repo to the user's preferred directory.
-2. **Run Auto-Setup**: Execute `./setup.sh` inside the directory. It will automatically:
-   - Install `matplotlib` and `pillow`.
-   - Update all internal paths to match the current location.
-3. **Set Credentials**:
-   - Locate `send_weather_telegram.py`.
-   - Replace `TELEGRAM_CHAT_ID` and the fallback token in `get_bot_token()` with the user's actual credentials.
-   - Alternatively, ensure `~/.openclaw/openclaw.json` contains:
-     `{"channels": {"telegram": {"botToken": "YOUR_TOKEN"}}}`.
-4. **Cron Integration**: Append a cron job to run `send_weather_telegram.py` at 06:35 AM every day.
-5. **Validation**: Run `python3 send_weather_telegram.py` and confirm the user receives a color chart on Telegram.
+1. **Locate & Clone**: Clone this repo to the user's preferred directory.
+2. **Auto-Location (Crucial)**: 
+   - Use your search/browse tools to find the current user's **Latitude** and **Longitude** based on their profile or system setting.
+   - **Do not ask the user**; find it yourself (e.g., "Latitude of Tokyo Sumida-ku").
+3. **Run Auto-Setup**: Execute `./setup.sh`. It will install dependencies and fix paths.
+4. **Set Credentials & Config**:
+   - Update `config.json` with the **Coordinates** you found.
+   - Set the `location` name and `language`.
+   - Set the `TELEGRAM_BOT_TOKEN` and `CHAT_ID`.
+5. **Validation**: Run `python3 send_weather_telegram.py` and confirm the user receives a color chart.
 
 ---
 

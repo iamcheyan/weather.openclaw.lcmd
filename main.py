@@ -2,11 +2,22 @@
 import requests
 import sys
 import os
+import json
 from datetime import datetime
 
-# 墨田区 (Sumida-ku) 坐标
-LAT = 35.71
-LON = 139.81
+# 加载配置
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
+def load_config():
+    if os.path.exists(CONFIG_PATH):
+        with open(CONFIG_PATH, 'r') as f:
+            return json.load(f)
+    return {}
+
+config = load_config()
+user_conf = config.get("user", {})
+LAT = user_conf.get("latitude", 35.71)
+LON = user_conf.get("longitude", 139.81)
+LOC_NAME = user_conf.get("location", "Unknown Location")
 
 def get_weather():
     # 获取过去3天和未来4天（包含今天）的数据
@@ -46,11 +57,12 @@ def main():
     # 索引 3 是今天 (由于 past_days=3)
     today_idx = 3
     
-    report = f"📊 东京 墨田区 天气趋势报告 ({times[today_idx]})\n"
-    report += "="*40 + "\n"
+    report = f"📊 {LOC_NAME} 天气趋势报告 ({times[today_idx]})\n"
+    # 移除之前的 ====================
+    report += "\n"
 
     # 1. 过去3天回顾
-    report += "\n🕰️ 过去3天回顾:\n"
+    report += "🕰️ 过去3天回顾:\n"
     for i in range(0, 3):
         report += f"   {times[i]}: {max_temps[i]}°C / {min_temps[i]}°C ({translate_weather_code(weather_codes[i])})\n"
 
@@ -66,7 +78,6 @@ def main():
         report += f"   {times[i]}: {max_temps[i]}°C / {min_temps[i]}°C ({translate_weather_code(weather_codes[i])})\n"
 
     # 4. 气温趋势分析
-    # 比较前天、昨天和今天、明天的最高温
     yesterday_temp = max_temps[today_idx - 1]
     today_temp = max_temps[today_idx]
     tomorrow_temp = max_temps[today_idx + 1]
@@ -87,13 +98,12 @@ def main():
     elif diff_tomorrow < -1.5:
         report += f"   提示：预计明天会明显变冷 ({diff_tomorrow:+.1f}°C)，注意保暖！\n"
 
-    report += "\n" + "-"*40 + "\n"
+    # 移除之前的 --------------------
+    report += "\n"
     
     if prec_probs[today_idx] > 30:
         report += "💡 提醒：今天降水概率较高，请记得带伞。"
     
-    print(report)
-
     # 保存到文件
     save_path = os.path.join(os.path.dirname(__file__), "daily_weather.txt")
     with open(save_path, "w", encoding="utf-8") as f:

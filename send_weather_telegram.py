@@ -44,6 +44,13 @@ def main():
 
     print("Starting weather notification with chart...")
     
+    # 0. 抓取最新数据
+    try:
+        print("Fetching latest weather data...")
+        subprocess.run([sys.executable, os.path.join(os.path.dirname(__file__), "main.py")], check=True)
+    except Exception as e:
+        print(f"Warning: Could not fetch latest data: {e}")
+
     # 1. 生成图表
     try:
         subprocess.run([sys.executable, CHART_SCRIPT, WEATHER_FILE, IMAGE_FILE], check=True)

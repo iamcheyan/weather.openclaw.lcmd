@@ -100,8 +100,6 @@ def main():
     elif diff_tomorrow < -1.5: report += f"   提示：预计明天会明显变冷 ({diff_tomorrow:+.1f}°C)，注意保暖！\n"
 
     report += "\n"
-    if h_today:
-        report += f"🍵 提醒：今天是祝日「{h_today}」，工作先放放，好好休息一下吧。\n"
     if prec_probs[today_idx] > 30:
         report += "💡 提醒：今天降水概率较高，请记得带伞。\n"
     

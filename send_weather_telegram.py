@@ -5,111 +5,71 @@ import json
 import requests
 import subprocess
 
-# Config
-TELEGRAM_CHAT_ID = "7054611053"
-WEATHER_SCRIPT = "/home/tetsuya/weather.openclaw.lcmd/weather_notifier.py"
-WEATHER_CHART_SCRIPT = "/home/tetsuya/weather.openclaw.lcmd/weather_chart.py"
-WEATHER_FILE = "/home/tetsuya/weather.openclaw.lcmd/daily_weather.txt"
-WEATHER_IMAGE = "/home/tetsuya/weather.openclaw.lcmd/weather_trend.png"
-CONFIG_PATH = os.path.expanduser("~/.openclaw/openclaw.json")
+# 加载配置
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
+
+def load_config():
+    if os.path.exists(CONFIG_PATH):
+        with open(CONFIG_PATH, 'r') as f:
+            return json.load(f)
+    return {}
+
+config = load_config()
+
+# 动态配置项
+TELEGRAM_CHAT_ID = config.get("telegram", {}).get("chatId", "")
+WEATHER_SCRIPT = os.path.join(os.path.dirname(__file__), "weather_notifier.py")
+CHART_SCRIPT = os.path.join(os.path.dirname(__file__), "weather_chart.py")
+WEATHER_FILE = config.get("paths", {}).get("daily_weather", "./daily_weather.txt")
+IMAGE_FILE = config.get("paths", {}).get("weather_trend_image", "./weather_trend.png")
 
 def get_bot_token():
-    # Try env var first
-    token = os.environ.get("TELEGRAM_BOT_TOKEN")
-    if token:
-        return token
-    
-    # Try config file
+    token = config.get("telegram", {}).get("botToken")
+    if token: return token
+    # Fallback to OpenClaw system config
     try:
-        if os.path.exists(CONFIG_PATH):
-            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-                cfg = json.load(f)
-            return cfg.get("channels", {}).get("telegram", {}).get("botToken")
-    except Exception as e:
-        print(f"Error reading config: {e}", file=sys.stderr)
-    
-    # Fallback to the known token if file read fails (User authorized use)
-    return "8211541588:AAFUFT1BlylUumgGR3VMWSv4iJDJ-OUGfSA"
-
-def get_weather_message():
-    # Run the notifier script to get the formatted message
-    try:
-        result = subprocess.run(
-            [sys.executable, WEATHER_SCRIPT, WEATHER_FILE],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        return result.stdout.strip()
-    except Exception as e:
-        print(f"Error getting weather message: {e}", file=sys.stderr)
-        return None
-
-def generate_chart():
-    try:
-        subprocess.run([sys.executable, WEATHER_CHART_SCRIPT, WEATHER_FILE, WEATHER_IMAGE], check=True)
-        return True
-    except Exception as e:
-        print(f"Error generating chart: {e}", file=sys.stderr)
-        return False
-
-def send_telegram_photo(photo_path, caption):
-    token = get_bot_token()
-    if not token: return False
-    
-    url = f"https://api.telegram.org/bot{token}/sendPhoto"
-    
-    # Telegram caption limit is 1024 characters.
-    if len(caption) > 1024:
-        # If too long, send empty caption and post text as separate message
-        has_long_caption = True
-        short_caption = ""
-    else:
-        has_long_caption = False
-        short_caption = caption
-
-    try:
-        with open(photo_path, 'rb') as photo:
-            files = {'photo': photo}
-            payload = {'chat_id': TELEGRAM_CHAT_ID, 'caption': short_caption}
-            resp = requests.post(url, data=payload, files=files, timeout=30)
-            resp.raise_for_status()
-        
-        if has_long_caption:
-            send_telegram_text(caption)
-        
-        return True
-    except Exception as e:
-        print(f"Error sending photo: {e}", file=sys.stderr)
-        return False
-
-def send_telegram_text(message):
-    token = get_bot_token()
-    if not token: return False
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
-    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
-    try:
-        requests.post(url, json=payload, timeout=30).raise_for_status()
-        return True
-    except Exception as e:
-        print(f"Error sending text: {e}", file=sys.stderr)
-        return False
+        sys_config = os.path.expanduser("~/.openclaw/openclaw.json")
+        if os.path.exists(sys_config):
+            with open(sys_config, 'r') as f:
+                data = json.load(f)
+                return data.get("channels", {}).get("telegram", {}).get("botToken")
+    except: pass
+    return None
 
 def main():
-    print("Starting weather notification with chart...")
-    message = get_weather_message()
-    if not message:
-        print("Failed to generate weather message.")
+    token = get_bot_token()
+    if not token or not TELEGRAM_CHAT_ID:
+        print("Error: TELEGRAM_BOT_TOKEN or CHAT_ID not found.")
         return
 
-    generate_chart()
+    print("Starting weather notification with chart...")
     
-    if os.path.exists(WEATHER_IMAGE):
+    # 1. 生成图表
+    try:
+        subprocess.run([sys.executable, CHART_SCRIPT, WEATHER_FILE, IMAGE_FILE], check=True)
+    except Exception as e:
+        print(f"Error generating chart: {e}")
+
+    # 2. 生成文字建议
+    try:
+        process = subprocess.Popen([sys.executable, WEATHER_SCRIPT, WEATHER_FILE], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        caption, _ = process.communicate()
+    except Exception as e:
+        caption = "今日天气预报已更新，请查看图表。"
+
+    # 3. 发送 Telegram 消息 (图片 + 文案)
+    url = f"https://api.telegram.org/bot{token}/sendPhoto"
+    
+    if os.path.exists(IMAGE_FILE):
         print("Sending photo with caption...")
-        send_telegram_photo(WEATHER_IMAGE, message)
+        with open(IMAGE_FILE, "rb") as photo:
+            files = {"photo": photo}
+            data = {"chat_id": TELEGRAM_CHAT_ID, "caption": caption}
+            response = requests.post(url, files=files, data=data)
     else:
-        print("Chart not found, sending text only...")
-        send_telegram_text(message)
+        print("Image not found, sending text only...")
+        url_text = f"https://api.telegram.org/bot{token}/sendMessage"
+        requests.post(url_text, data={"chat_id": TELEGRAM_CHAT_ID, "text": caption})
 
 if __name__ == "__main__":
     main()

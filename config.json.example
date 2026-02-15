@@ -1,0 +1,14 @@
+{
+  "user": {
+    "location": "Tokyo",
+    "language": "en"
+  },
+  "telegram": {
+    "botToken": "YOUR_TOKEN_HERE",
+    "chatId": "YOUR_CHAT_ID_HERE"
+  },
+  "paths": {
+    "daily_weather": "./daily_weather.txt",
+    "weather_trend_image": "./weather_trend.png"
+  }
+}

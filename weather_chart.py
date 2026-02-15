@@ -5,7 +5,26 @@ import matplotlib.dates as mdates
 from datetime import datetime
 import sys
 import os
+import json
 from PIL import Image, ImageDraw, ImageFont
+
+# 1. 加载配置与国际化
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
+def load_config():
+    if os.path.exists(CONFIG_PATH):
+        with open(CONFIG_PATH, 'r') as f: return json.load(f)
+    return {}
+
+config = load_config()
+lang = config.get("user", {}).get("language", "en")
+loc_name = config.get("user", {}).get("location", "Tokyo")
+
+I18N = {
+    "zh": {"title": f"{loc_name} 天气趋势与预报", "today": "今天", "high": "最高温", "low": "最低温"},
+    "en": {"title": f"{loc_name} Weather Trend & Forecast", "today": "Today", "high": "Max Temp", "low": "Min Temp"},
+    "ja": {"title": f"{loc_name} 天気トレンドと予報", "today": "今日", "high": "最高気温", "low": "最低気温"}
+}
+t = I18N.get(lang, I18N["en"])
 
 # 配置基础字体
 plt.rcParams['font.sans-serif'] = ['Noto Sans CJK SC', 'Noto Sans CJK JP', 'DejaVu Sans']
@@ -51,20 +70,19 @@ def create_chart(weather_file, output_file):
     ax.set_facecolor('#fdfdfd')
     color_high, color_low = '#FF9F43', '#48DBFB'
     
-    ax.plot(dates, highs, marker='o', markersize=6, color=color_high, linewidth=4, markerfacecolor='white', markeredgewidth=2)
-    ax.plot(dates, lows, marker='o', markersize=6, color=color_low, linewidth=4, markerfacecolor='white', markeredgewidth=2)
+    ax.plot(dates, highs, marker='o', markersize=6, color=color_high, linewidth=4, markerfacecolor='white', markeredgewidth=2, label=t['high'])
+    ax.plot(dates, lows, marker='o', markersize=6, color=color_low, linewidth=4, markerfacecolor='white', markeredgewidth=2, label=t['low'])
     
     today_str = datetime.now().strftime('%Y-%m-%d')
     for d in dates:
         if d.strftime('%Y-%m-%d') == today_str:
             ax.axvline(x=d, color='#666666', linestyle='--', linewidth=1, alpha=0.2)
-            ax.text(d, min(lows) - 3.5, 'Today', ha='center', va='top', color='#2d3436', fontweight='bold', fontsize=12)
+            ax.text(d, min(lows) - 3.5, t['today'], ha='center', va='top', color='#2d3436', fontweight='bold', fontsize=12)
             break
 
     ax.fill_between(dates, highs, lows, color='#f0f0f0', alpha=0.3)
     
     for i, (h, l) in enumerate(zip(highs, lows)):
-        # 气温数字离点近一点
         ax.text(dates[i], h + 0.5, f'{int(h)}°', ha='center', va='bottom', color='#333333', fontweight='medium', fontsize=10)
         ax.text(dates[i], l - 0.5, f'{int(l)}°', ha='center', va='top', color='#333333', fontweight='medium', fontsize=10)
 
@@ -73,7 +91,8 @@ def create_chart(weather_file, output_file):
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
     plt.xticks(dates, color='#666666', fontsize=10)
     plt.yticks([])
-    plt.title('Tokyo Weather Trend & Forecast', color='#2d3436', fontsize=16, pad=50, fontweight='bold')
+    plt.title(t['title'], color='#2d3436', fontsize=16, pad=50, fontweight='bold')
+    plt.legend(loc='upper right', frameon=False)
     plt.ylim(min(lows) - 5, max(highs) + 12)
     plt.tight_layout()
 
@@ -90,39 +109,26 @@ def create_chart(weather_file, output_file):
     try:
         img = Image.open(temp_base).convert("RGBA")
         width, height = img.size
-        
         emoji_font_path = "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf"
-        # 强制用大号渲染以保证彩色，然后缩小贴图
-        native_size = 109
-        target_size = 40 # 缩小到这个像素大小
+        native_size, target_size = 109, 40
         fnt = ImageFont.truetype(emoji_font_path, native_size)
         
         for i, px in enumerate(points_px):
             emoji = get_weather_emoji(conds[i])
             x, y = int(px[0]), int(height - px[1])
-            
-            # 创建一个小画布画 Emoji
             temp_emoji_img = Image.new("RGBA", (native_size + 20, native_size + 20), (0, 0, 0, 0))
-            temp_draw = ImageDraw.Draw(temp_emoji_img)
-            temp_draw.text((native_size // 2 + 10, native_size // 2 + 10), emoji, font=fnt, embedded_color=True, anchor="mm")
-            
-            # 缩放到目标大小
+            ImageDraw.Draw(temp_emoji_img).text((native_size // 2 + 10, native_size // 2 + 10), emoji, font=fnt, embedded_color=True, anchor="mm")
             resized_emoji = temp_emoji_img.resize((target_size, target_size), resample=Image.LANCZOS)
-            
-            # 贴入主图
-            offset_x = x - (target_size // 2)
-            offset_y = y - 90 # 往上提！从 55 改成 90，给数字留空位
-            img.alpha_composite(resized_emoji, (offset_x, offset_y))
+            img.alpha_composite(resized_emoji, (x - (target_size // 2), y - 90))
         
         img.save(output_file)
         if os.path.exists(temp_base): os.remove(temp_base)
-        print(f"Resized color icons successful.")
         return True
     except Exception as e:
-        print(f"Pillow final fail: {e}")
         if os.path.exists(temp_base): os.rename(temp_base, output_file)
         return False
 
 if __name__ == "__main__":
-    create_chart("/home/tetsuya/weather.openclaw.lcmd/daily_weather.txt", 
-                 "/home/tetsuya/weather.openclaw.lcmd/weather_trend.png")
+    infile = sys.argv[1] if len(sys.argv) > 1 else "./daily_weather.txt"
+    outfile = sys.argv[2] if len(sys.argv) > 2 else "./weather_trend.png"
+    create_chart(infile, outfile)

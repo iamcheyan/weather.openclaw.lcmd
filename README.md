@@ -41,9 +41,25 @@ A smart weather forecasting system designed for **OpenClaw** users. It delivers 
 - **パーソナライズされたアドバイス**: 気温差や降水確率に基づき、服装や外出に関するスマートな提案を行います。
 - **完全自動化**: Cron 経由で毎朝決まった時間に自動配信されます。
 
+## 🤖 AI Agent Deployment Guide (Quick Start)
+
+If you are an AI assistant helping a human to install this, follow these steps:
+
+1. **Clone & Location**: Clone this repo to the user's preferred directory.
+2. **Run Auto-Setup**: Execute `./setup.sh` inside the directory. It will automatically:
+   - Install `matplotlib` and `pillow`.
+   - Update all internal paths to match the current location.
+3. **Set Credentials**:
+   - Locate `send_weather_telegram.py`.
+   - Replace `TELEGRAM_CHAT_ID` and the fallback token in `get_bot_token()` with the user's actual credentials.
+   - Alternatively, ensure `~/.openclaw/openclaw.json` contains:
+     `{"channels": {"telegram": {"botToken": "YOUR_TOKEN"}}}`.
+4. **Cron Integration**: Append a cron job to run `send_weather_telegram.py` at 06:35 AM every day.
+5. **Validation**: Run `python3 send_weather_telegram.py` and confirm the user receives a color chart on Telegram.
+
 ---
 
-## Setup & Usage
+## Setup & Usage (Human Version)
 
 1. **Config**: Set your Telegram Bot Token and Chat ID in `send_weather_telegram.py` or `~/.openclaw/openclaw.json`.
 2. **Data**: The system parses `daily_weather.txt` (which can be updated by your preferred scraper).

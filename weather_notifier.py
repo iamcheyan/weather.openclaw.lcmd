@@ -116,7 +116,7 @@ def parse_weather_data(weather_text):
                         trend_parts.append(trend_part)
                 else:
                     # 后续行，直接添加
-                    if '----------------------------------------' in lines[j]:
+                    if j < len(lines) and not lines[j].strip():
                         break
                     trend_parts.append(lines[j].strip())
                 j += 1

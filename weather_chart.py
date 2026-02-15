@@ -7,6 +7,7 @@ import sys
 import os
 import json
 from PIL import Image, ImageDraw, ImageFont
+import holidays # 引入假期库
 
 # 1. 加载配置与国际化
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
@@ -16,15 +17,17 @@ def load_config():
     return {}
 
 config = load_config()
-lang = config.get("user", {}).get("language", "en")
+lang = config.get("user", {}).get("language", "zh")
 loc_name = config.get("user", {}).get("location", "Tokyo")
+country = config.get("user", {}).get("country", "JP")
 
 I18N = {
-    "zh": {"title": f"{loc_name} 天气趋势与预报", "today": "今天", "high": "最高温", "low": "最低温"},
-    "en": {"title": f"{loc_name} Weather Trend & Forecast", "today": "Today", "high": "Max Temp", "low": "Min Temp"},
-    "ja": {"title": f"{loc_name} 天気トレンドと予報", "today": "今日", "high": "最高気温", "low": "最低気温"}
+    "zh": {"title": f"{loc_name} 天气趋势与预报", "today": "今天", "high": "最高温", "low": "最低温", "holiday": "祝日"},
+    "en": {"title": f"{loc_name} Weather Trend & Forecast", "today": "Today", "high": "Max Temp", "low": "Min Temp", "holiday": "Holiday"},
+    "ja": {"title": f"{loc_name} 天気トレンドと予報", "today": "今日", "high": "最高気温", "low": "最低気温", "holiday": "祝日"}
 }
 t = I18N.get(lang, I18N["en"])
+geo_holidays = holidays.CountryHoliday(country)
 
 # 配置基础字体
 plt.rcParams['font.sans-serif'] = ['Noto Sans CJK SC', 'Noto Sans CJK JP', 'DejaVu Sans']
@@ -48,7 +51,7 @@ def parse_weather_data(weather_text):
         data_map[date_obj] = {'high': float(m[1]), 'low': float(m[2]), 'cond': m[3]}
     
     today_date_match = re.search(r'今日天气 \((\d{4}-\d{2}-\d{2})\)', weather_text)
-    today_cond_match = re.search(r'今日天气.*?状况:\s*(.*?)\n', weather_text, re.DOTALL)
+    today_cond_match = re.search(r'今日天气.*?状况:\s*(.*?)(?:\s|\n|\()', weather_text, re.DOTALL)
     today_temp_match = re.search(r'今日天气.*?气温:\s*([\d.]+)°?C?\s*/\s*([\d.]+)°?C?', weather_text, re.DOTALL)
     
     if today_date_match and today_cond_match and today_temp_match:
@@ -80,6 +83,12 @@ def create_chart(weather_file, output_file):
             ax.text(d, min(lows) - 3.5, t['today'], ha='center', va='top', color='#2d3436', fontweight='bold', fontsize=12)
             break
 
+    # 绘制假期标注
+    for d in dates:
+        if d.date() in geo_holidays:
+            # 在底部日期上方一点，加一个淡红色的竖条
+            ax.axvspan(d - mdates.DateOffset(hours=6), d + mdates.DateOffset(hours=6), color='#ff4757', alpha=0.08)
+
     ax.fill_between(dates, highs, lows, color='#f0f0f0', alpha=0.3)
     
     for i, (h, l) in enumerate(zip(highs, lows)):
@@ -89,7 +98,21 @@ def create_chart(weather_file, output_file):
     for s in ['top', 'right', 'left']: ax.spines[s].set_visible(False)
     ax.spines['bottom'].set_color('#cccccc')
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
+    
+    # 动态着色：如果是假期，日期文字变红
+    xticks = ax.get_xticks()
     plt.xticks(dates, color='#666666', fontsize=10)
+    for label in ax.get_xticklabels():
+        # 这里需要从 label text 找回日期
+        try:
+            cur_date_str = label.get_text() # 格式 MM/DD
+            for d_orig in dates:
+                if d_orig.strftime('%m/%d') == cur_date_str:
+                    if d_orig.date() in geo_holidays:
+                        label.set_color('#ff4757')
+                        label.set_fontweight('bold')
+        except: pass
+
     plt.yticks([])
     plt.title(t['title'], color='#2d3436', fontsize=16, pad=50, fontweight='bold')
     plt.legend(loc='upper right', frameon=False)
